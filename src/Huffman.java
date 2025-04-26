@@ -27,42 +27,47 @@ public class Huffman {
         }
     }
 
-    private static void compress(DataInputStream input,DataOutputStream output) throws IOException{
-        byte[] bytes=input.readAllBytes();
-
+    private static void compress(String inputPath,DataOutputStream output) throws IOException{
         int[] freq= new int[R];
-        for(int i=0;i<bytes.length;i++){
-            freq[bytes[i] & 0xFF]++;
+        int size=0;
+        BufferedInputStream input=new BufferedInputStream(new FileInputStream(inputPath));
+        int b;
+        while((b=input.read())!=-1){
+            size++;
+            freq[b]++;
         }
+
 
         HuffmanNode root=buildTree(freq);
 
         String[] st=new String[R];
         buildCode(st,root,"");
 
-        output.writeInt(bytes.length);
-
+        output.writeInt(size);
         writeTree(output,root);
 
+        input=new BufferedInputStream(new FileInputStream(inputPath));
+
+
         int buffer=0;
-        int n=0;
-        for(byte b:bytes){
+        int bitCount=0;
+        while((b=input.read())!=-1){
             String code=st[b & 0xFF];
             for(char c:code.toCharArray()){
                 buffer <<=1;
                 if(c=='1'){
                     buffer |=1;
                 }
-                n++;
-                if(n==8){
+                bitCount++;
+                if(bitCount==8){
                     output.write(buffer);
                     buffer=0;
-                    n=0;
+                    bitCount=0;
                 }
             }
         }
-        if(n>0){
-            buffer <<=(8-n);
+        if(bitCount>0){
+            buffer <<=(8-bitCount);
             output.write(buffer);
         }
 
@@ -86,7 +91,7 @@ public class Huffman {
     public static void writeTree(DataOutputStream output,HuffmanNode x) throws IOException{
         if(x.isLeaf()){
             output.writeByte(1);
-            output.write(x.ch);
+            output.writeChar(x.ch);
             return;
         }
         output.writeByte(0);
@@ -137,8 +142,8 @@ public class Huffman {
     private static HuffmanNode readTree(DataInputStream input) throws IOException{
         int flag=input.readByte();
         if(flag==1){
-            int ch=input.readByte();
-            return new HuffmanNode((char) ch,-1,null,null);
+            char ch=input.readChar();
+            return new HuffmanNode(ch,-1,null,null);
         }else if(flag==0){
             HuffmanNode left=readTree(input);
             HuffmanNode right=readTree(input);
@@ -157,11 +162,26 @@ public class Huffman {
         try{
             DataInputStream input=new DataInputStream(new FileInputStream(args[1]));
             DataOutputStream output=new DataOutputStream(new FileOutputStream(args[2]));
-            if(args[0].equals("-")){
-                compress(input,output);
-            }else if(args[0].equals("+")){
+
+            long startTime=System.nanoTime();
+
+            if(args[0].equals("-c")){
+                compress(args[1],output);
+
+                File inputFile = new File(args[1]);
+                File outputFile = new File(args[2]);
+                long inputSize = inputFile.length();
+                long outputSize = outputFile.length();
+                double compressionRate=(double) outputSize / inputSize * 100.0;
+                System.out.println("Compression rate: "+compressionRate);
+
+            }else if(args[0].equals("-d")){
                 expand(input,output);
             }else throw new IllegalArgumentException("Illegal command line argument");
+
+            long endTime=System.nanoTime();
+            double elapsedTime = (endTime-startTime) / 1000000000.0;
+            System.out.println("Time in seconds: "+elapsedTime);
 
         }catch(IOException e){
             System.out.println(e.getMessage());
@@ -169,5 +189,4 @@ public class Huffman {
             System.out.println(e.getMessage());
         }
     }
-
 }
